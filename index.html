@@ -16,13 +16,14 @@
     table { border-collapse:collapse; margin-top:12px; width:100%; }
     th, td { border:1px solid #e6e6e6; padding:8px; text-align:center; }
     th { background:#f4f7fb; }
-    /* 要求的格式：文字绿粗、数值红粗、行间距2倍 */
+    /* 结果格式 */
     .resultBlock { color: #1b7a3a; font-weight:700; line-height:2; }
     .num { color: #d93b3b; font-weight:700; }
     .note { color:#d35400; font-weight:700; margin-top:8px; }
     .hidden { display:none; }
     .loginCard { max-width:420px; margin:40px auto; background:#fff; padding:16px; border-radius:10px; box-shadow:0 6px 18px rgba(20,30,50,0.06); }
     small.gray { color:#666; display:block; margin-top:6px; }
+    footer { margin-top:30px; font-size:13px; color:#444; }
   </style>
 </head>
 <body>
@@ -49,19 +50,6 @@
       <div class="module">
         <h2>Reference & Rates</h2>
         <p><strong>Conversion:</strong> 1 USD = 3.75 SAR = <strong>48.22 EGP</strong></p>
-        <p class="note">Unit price for targets: 225PK and above = <strong>1300 USD</strong>; Under 150PK = <strong>700 USD</strong></p>
-        <table aria-label="commission table">
-          <tr><th>Order Range</th><th>Commission Rate</th></tr>
-          <tr><td>0 – 3</td><td>0%</td></tr>
-          <tr><td>4 – 6</td><td>1%</td></tr>
-          <tr><td>7 – 9</td><td>1.5%</td></tr>
-          <tr><td>10 – 14</td><td>2%</td></tr>
-          <tr><td>15 – 19</td><td>2.5%</td></tr>
-          <tr><td>20 – 24</td><td>3%</td></tr>
-          <tr><td>25 – 29</td><td>3.5%</td></tr>
-          <tr><td>30 – 39</td><td>4%</td></tr>
-          <tr><td>40+</td><td>5%</td></tr>
-        </table>
       </div>
 
       <!-- Current Commission -->
@@ -77,6 +65,7 @@
       <!-- Target Commission -->
       <div class="module">
         <h2>2. Target Commission Simulation</h2>
+        <p class="note">Unit price for targets: 225PK and above = <strong>1300 USD</strong>; Under 150PK = <strong>700 USD</strong></p>
         <label>225PK and above contract target (count): <input id="above225" type="number" min="0"></label>
         <label>Under 150PK contract target (count): <input id="under150" type="number" min="0"></label>
         <button onclick="calculateTarget()">Calculate Target Commission</button>
@@ -84,14 +73,31 @@
         <div id="targetResult" style="margin-top:12px"></div>
       </div>
 
+      <!-- Footer Commission Table -->
+      <footer>
+        <p><strong>Overall Commission Tiers (for reference):</strong></p>
+        <table>
+          <tr><th>Order Range</th><th>Commission Rate</th></tr>
+          <tr><td>0 – 3</td><td>0%</td></tr>
+          <tr><td>4 – 6</td><td>1%</td></tr>
+          <tr><td>7 – 9</td><td>1.5%</td></tr>
+          <tr><td>10 – 14</td><td>2%</td></tr>
+          <tr><td>15 – 19</td><td>2.5%</td></tr>
+          <tr><td>20 – 24</td><td>3%</td></tr>
+          <tr><td>25 – 29</td><td>3.5%</td></tr>
+          <tr><td>30 – 39</td><td>4%</td></tr>
+          <tr><td>40+</td><td>5%</td></tr>
+        </table>
+        <p><em>Note: Commission tiers may be adjusted according to business needs.</em></p>
+      </footer>
+
     </div> <!-- end content -->
   </div>
 
 <script>
-/* ---------- 登录（前端校验，支持多人同时访问并登录） ---------- */
+/* ---------- 登录 ---------- */
 const ALLOWED_USERS = [
   {user: 'EGEA', pass: 'unstopable'}
-  // 可以在这里加更多 {user:'xxx', pass:'yyy'}，多用户可同时登录（前端方式）
 ];
 
 function login(){
@@ -101,7 +107,6 @@ function login(){
   if(ok){
     document.getElementById('loginBox').classList.add('hidden');
     document.getElementById('content').classList.remove('hidden');
-    // 清空错误
     document.getElementById('loginError').innerText = '';
   } else {
     document.getElementById('loginError').innerText = 'Wrong username or password!';
@@ -111,7 +116,7 @@ function login(){
 /* ---------- 参数 ---------- */
 const usdToEGP = 48.22;
 
-/* ---------- 正确的提成区间逻辑（按你给的区间） ---------- */
+/* ---------- 提成区间 ---------- */
 function getRateByContracts(n){
   if (n >= 40) return 0.05;
   if (n >= 30) return 0.04;
@@ -124,7 +129,6 @@ function getRateByContracts(n){
   return 0.00;
 }
 
-/* 返回下一个阈值（严格大于 current），若无则返回 null */
 function getNextThreshold(n){
   const thresholds = [4,7,10,15,20,25,30,40];
   for (let t of thresholds){
@@ -133,7 +137,7 @@ function getNextThreshold(n){
   return null;
 }
 
-/* ---------- Current Commission 计算（含 0.8/1/1.2 系数显示 & 升档提示） ---------- */
+/* ---------- Current Commission ---------- */
 function formatMoneyEGP(x){
   return Number(x).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
 }
@@ -147,33 +151,30 @@ function calculateCurrent(){
     return;
   }
 
-  const rate = getRateByContracts(salary);             // 当前档位 %（小数）
-  const avgUnit = (salary>0) ? (cash / salary) : 0;    // 单价由用户数据决定
-  // 三个系数结果（系数=0.8,1,1.2），按 spec: commission = actualCash * rate * coefficient
+  const rate = getRateByContracts(salary);
+  const avgUnit = (salary>0) ? (cash / salary) : 0;
+
   const commissionUSD_co_1   = cash * rate * 1.0;
   const commissionUSD_co_08  = cash * rate * 0.8;
   const commissionUSD_co_12  = cash * rate * 1.2;
+
   const commissionEGP_co_1   = commissionUSD_co_1 * usdToEGP;
   const commissionEGP_co_08  = commissionUSD_co_08 * usdToEGP;
   const commissionEGP_co_12  = commissionUSD_co_12 * usdToEGP;
 
-  // 下一档计算（使用 avgUnit 估算增加的营收，默认系数 = 1）
   const next = getNextThreshold(salary);
   let nextMsgHTML = '';
   if (next !== null){
     const need = next - salary;
-    // 未来营收（USD） = (salary + need) * avgUnit
     const futureRevenueUSD = (salary + need) * avgUnit;
     const nextRate = getRateByContracts(next);
-    const futureCommissionEGP = futureRevenueUSD * nextRate * usdToEGP; // use coefficient = 1 per spec
-    const currentCommissionEGP = commissionEGP_co_1;
-    const delta = futureCommissionEGP - currentCommissionEGP;
+    const futureCommissionEGP = futureRevenueUSD * nextRate * usdToEGP;
+    const delta = futureCommissionEGP - commissionEGP_co_1;
     nextMsgHTML = `<p class="resultBlock">If get <span class="num">${need}</span> more contracts, commission comes to <span class="num">${formatMoneyEGP(futureCommissionEGP)}</span> EGP, JIAYOU EGEA! (increase <span class="num">${formatMoneyEGP(delta)}</span> EGP)</p>`;
   } else {
     nextMsgHTML = `<p class="resultBlock">No higher commission threshold defined beyond current orders.</p>`;
   }
 
-  // 输出（格式要求：文字绿粗，数值红粗，行间距2倍）
   const out = `
     <div class="resultBlock">
       <p>current commission rate： <span class="num">${(rate*100).toFixed(2)}%</span></p>
@@ -186,11 +187,10 @@ function calculateCurrent(){
       ${nextMsgHTML}
     </div>
   `;
-
   document.getElementById('currentResult').innerHTML = out;
 }
 
-/* ---------- Target Commission 计算（两个输入，单价分别 1300 / 700 USD） ---------- */
+/* ---------- Target Commission ---------- */
 function calculateTarget(){
   const above225 = parseInt(document.getElementById('above225').value) || 0;
   const under150 = parseInt(document.getElementById('under150').value) || 0;
@@ -208,7 +208,6 @@ function calculateTarget(){
   `;
   document.getElementById('targetResult').innerHTML = out;
 }
-
 </script>
 </body>
 </html>
