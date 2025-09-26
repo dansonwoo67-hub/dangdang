@@ -1,141 +1,214 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8" />
   <title>EGEA Commission Simulator (only for reference)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; line-height: 2; }
-    h1 { color: darkblue; }
-    h2 { color: green; font-weight: bold; }
-    .result { color: green; font-weight: bold; }
-    .highlight { color: red; font-weight: bold; }
-    .hidden { display: none; }
-    input, button { margin: 5px; padding: 5px; }
+    body { font-family: Arial, sans-serif; margin: 20px; background:#f7fafc; color:#111; }
+    .wrap { max-width:920px; margin:0 auto; }
+    h1 { color:#1f4b8b; margin-bottom:6px; }
+    h3.sub { color:#e74c3c; margin-top:0; margin-bottom:12px; }
+    label { display:block; margin-top:8px; }
+    input[type=number], input[type=text], input[type=password] { padding:8px; width:220px; border-radius:6px; border:1px solid #ccc; }
+    button { padding:8px 12px; border-radius:8px; border:0; background:#0b66ff; color:#fff; cursor:pointer; margin-top:10px; }
+    .module { background:#fff; padding:14px; border-radius:10px; box-shadow:0 6px 18px rgba(20,30,50,0.06); margin-bottom:16px; }
+    table { border-collapse:collapse; margin-top:12px; width:100%; }
+    th, td { border:1px solid #e6e6e6; padding:8px; text-align:center; }
+    th { background:#f4f7fb; }
+    /* 要求的格式：文字绿粗、数值红粗、行间距2倍 */
+    .resultBlock { color: #1b7a3a; font-weight:700; line-height:2; }
+    .num { color: #d93b3b; font-weight:700; }
+    .note { color:#d35400; font-weight:700; margin-top:8px; }
+    .hidden { display:none; }
+    .loginCard { max-width:420px; margin:40px auto; background:#fff; padding:16px; border-radius:10px; box-shadow:0 6px 18px rgba(20,30,50,0.06); }
+    small.gray { color:#666; display:block; margin-top:6px; }
   </style>
 </head>
 <body>
-  <!-- 登录界面 -->
-  <div id="loginBox">
-    <h2>Login Required</h2>
-    <p>Username: <input type="text" id="username"></p>
-    <p>Password: <input type="password" id="password"></p>
-    <button onclick="login()">Login</button>
-    <p id="loginError" style="color:red;"></p>
+  <div class="wrap">
+
+    <!-- 登录 -->
+    <div id="loginBox" class="loginCard">
+      <h2>Login Required</h2>
+      <label>Username: <input id="username" type="text" placeholder="EGEA"></label>
+      <label>Password: <input id="password" type="password" placeholder="unstopable"></label>
+      <div style="margin-top:8px">
+        <button onclick="login()">Login</button>
+      </div>
+      <p id="loginError" style="color:#d93b3b;margin-top:8px"></p>
+      <small class="gray">Note: This is front-end protection only. For real security use server-side auth.</small>
+    </div>
+
+    <!-- 主内容 -->
+    <div id="content" class="hidden">
+
+      <h1>EGEA Commission Simulator (only for reference)</h1>
+      <h3 class="sub">Upgrade rate should be over 20%! Jiayou! Otherwise, commission will be subject to discount.</h3>
+
+      <div class="module">
+        <h2>Reference & Rates</h2>
+        <p><strong>Conversion:</strong> 1 USD = 3.75 SAR = <strong>48.22 EGP</strong></p>
+        <p class="note">Unit price for targets: 225PK and above = <strong>1300 USD</strong>; Under 150PK = <strong>700 USD</strong></p>
+        <table aria-label="commission table">
+          <tr><th>Order Range</th><th>Commission Rate</th></tr>
+          <tr><td>0 – 3</td><td>0%</td></tr>
+          <tr><td>4 – 6</td><td>1%</td></tr>
+          <tr><td>7 – 9</td><td>1.5%</td></tr>
+          <tr><td>10 – 14</td><td>2%</td></tr>
+          <tr><td>15 – 19</td><td>2.5%</td></tr>
+          <tr><td>20 – 24</td><td>3%</td></tr>
+          <tr><td>25 – 29</td><td>3.5%</td></tr>
+          <tr><td>30 – 39</td><td>4%</td></tr>
+          <tr><td>40+</td><td>5%</td></tr>
+        </table>
+      </div>
+
+      <!-- Current Commission -->
+      <div class="module">
+        <h2>1. Current Commission Simulation</h2>
+        <label>Salary Contract (orders): <input id="salaryContract" type="number" min="0"></label>
+        <label>Actual Cash (USD): <input id="actualCash" type="number" min="0" step="0.01"></label>
+        <button onclick="calculateCurrent()">Calculate Current Commission</button>
+
+        <div id="currentResult" style="margin-top:12px"></div>
+      </div>
+
+      <!-- Target Commission -->
+      <div class="module">
+        <h2>2. Target Commission Simulation</h2>
+        <label>225PK and above contract target (count): <input id="above225" type="number" min="0"></label>
+        <label>Under 150PK contract target (count): <input id="under150" type="number" min="0"></label>
+        <button onclick="calculateTarget()">Calculate Target Commission</button>
+
+        <div id="targetResult" style="margin-top:12px"></div>
+      </div>
+
+    </div> <!-- end content -->
   </div>
 
-  <!-- 主内容 -->
-  <div id="content" class="hidden">
-    <h1>EGEA Commission Simulator (only for reference)</h1>
-    <h2>Upgrade Rate should be over 20%!! Jiayou! Otherwise commission will be subject to discount.</h2>
+<script>
+/* ---------- 登录（前端校验，支持多人同时访问并登录） ---------- */
+const ALLOWED_USERS = [
+  {user: 'EGEA', pass: 'unstopable'}
+  // 可以在这里加更多 {user:'xxx', pass:'yyy'}，多用户可同时登录（前端方式）
+];
 
-    <!-- Current Commission -->
-    <h2>Current Commission Simulation</h2>
-    <p>Salary Contract: <input type="number" id="salaryContract"></p>
-    <p>Actual Cash (USD): <input type="number" id="actualCash"></p>
-    <button onclick="calculateCurrent()">Calculate Current Commission</button>
-    <div id="currentResult"></div>
+function login(){
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value;
+  const ok = ALLOWED_USERS.some(x => x.user === u && x.pass === p);
+  if(ok){
+    document.getElementById('loginBox').classList.add('hidden');
+    document.getElementById('content').classList.remove('hidden');
+    // 清空错误
+    document.getElementById('loginError').innerText = '';
+  } else {
+    document.getElementById('loginError').innerText = 'Wrong username or password!';
+  }
+}
 
-    <!-- Target Commission -->
-    <h2>Target Commission Simulation</h2>
-    <p>225PK and above contract target: <input type="number" id="above225"></p>
-    <p>Under 150PK contract target: <input type="number" id="under150"></p>
-    <button onclick="calculateTarget()">Calculate Target Commission</button>
-    <div id="targetResult"></div>
-  </div>
+/* ---------- 参数 ---------- */
+const usdToEGP = 48.22;
 
-  <script>
-    // 登录逻辑
-    function login() {
-      const user = document.getElementById("username").value;
-      const pass = document.getElementById("password").value;
-      if (user === "EGEA" && pass === "unstopable") {
-        document.getElementById("loginBox").classList.add("hidden");
-        document.getElementById("content").classList.remove("hidden");
-      } else {
-        document.getElementById("loginError").innerText = "Wrong username or password!";
-      }
-    }
+/* ---------- 正确的提成区间逻辑（按你给的区间） ---------- */
+function getRateByContracts(n){
+  if (n >= 40) return 0.05;
+  if (n >= 30) return 0.04;
+  if (n >= 25) return 0.035;
+  if (n >= 20) return 0.03;
+  if (n >= 15) return 0.025;
+  if (n >= 10) return 0.02;
+  if (n >= 7) return 0.015;
+  if (n >= 4) return 0.01;
+  return 0.00;
+}
 
-    // 汇率
-    const usdToEGP = 48.22;
+/* 返回下一个阈值（严格大于 current），若无则返回 null */
+function getNextThreshold(n){
+  const thresholds = [4,7,10,15,20,25,30,40];
+  for (let t of thresholds){
+    if (t > n) return t;
+  }
+  return null;
+}
 
-    // 提成表（示例）
-    const commissionBars = [
-      { contracts: 0, rate: 0.02 },
-      { contracts: 3, rate: 0.04 },
-      { contracts: 5, rate: 0.06 },
-      { contracts: 8, rate: 0.08 },
-      { contracts: 12, rate: 0.1 },
-      { contracts: 20, rate: 0.12 }
-    ];
+/* ---------- Current Commission 计算（含 0.8/1/1.2 系数显示 & 升档提示） ---------- */
+function formatMoneyEGP(x){
+  return Number(x).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+}
 
-    function getRateByContracts(n) {
-      let rate = 0;
-      for (let i=0; i<commissionBars.length; i++) {
-        if (n >= commissionBars[i].contracts) rate = commissionBars[i].rate;
-      }
-      return rate;
-    }
+function calculateCurrent(){
+  const salary = parseInt(document.getElementById('salaryContract').value);
+  const cash = parseFloat(document.getElementById('actualCash').value);
 
-    function getNextThreshold(n) {
-      for (let i=0; i<commissionBars.length; i++) {
-        if (commissionBars[i].contracts > n) return commissionBars[i].contracts;
-      }
-      return null;
-    }
+  if (isNaN(salary) || salary <= 0 || isNaN(cash) || cash < 0){
+    alert('请先输入有效的 Salary Contract（>0）和 Actual Cash（>=0）');
+    return;
+  }
 
-    // Current Commission 计算
-    function calculateCurrent() {
-      const salary = parseInt(document.getElementById("salaryContract").value);
-      const cash = parseFloat(document.getElementById("actualCash").value);
-      if (isNaN(salary) || isNaN(cash)) {
-        alert("Please enter both values");
-        return;
-      }
-      const avgUnit = cash / salary;
-      const rate = getRateByContracts(salary);
+  const rate = getRateByContracts(salary);             // 当前档位 %（小数）
+  const avgUnit = (salary>0) ? (cash / salary) : 0;    // 单价由用户数据决定
+  // 三个系数结果（系数=0.8,1,1.2），按 spec: commission = actualCash * rate * coefficient
+  const commissionUSD_co_1   = cash * rate * 1.0;
+  const commissionUSD_co_08  = cash * rate * 0.8;
+  const commissionUSD_co_12  = cash * rate * 1.2;
+  const commissionEGP_co_1   = commissionUSD_co_1 * usdToEGP;
+  const commissionEGP_co_08  = commissionUSD_co_08 * usdToEGP;
+  const commissionEGP_co_12  = commissionUSD_co_12 * usdToEGP;
 
-      // upgrade coefficient
-      const com1 = cash * rate * usdToEGP;
-      const com08 = cash * rate * 0.8 * usdToEGP;
-      const com12 = cash * rate * 1.2 * usdToEGP;
+  // 下一档计算（使用 avgUnit 估算增加的营收，默认系数 = 1）
+  const next = getNextThreshold(salary);
+  let nextMsgHTML = '';
+  if (next !== null){
+    const need = next - salary;
+    // 未来营收（USD） = (salary + need) * avgUnit
+    const futureRevenueUSD = (salary + need) * avgUnit;
+    const nextRate = getRateByContracts(next);
+    const futureCommissionEGP = futureRevenueUSD * nextRate * usdToEGP; // use coefficient = 1 per spec
+    const currentCommissionEGP = commissionEGP_co_1;
+    const delta = futureCommissionEGP - currentCommissionEGP;
+    nextMsgHTML = `<p class="resultBlock">If get <span class="num">${need}</span> more contracts, commission comes to <span class="num">${formatMoneyEGP(futureCommissionEGP)}</span> EGP, JIAYOU EGEA! (increase <span class="num">${formatMoneyEGP(delta)}</span> EGP)</p>`;
+  } else {
+    nextMsgHTML = `<p class="resultBlock">No higher commission threshold defined beyond current orders.</p>`;
+  }
 
-      // 下一档
-      const next = getNextThreshold(salary);
-      let nextMsg = "";
-      if (next) {
-        const need = next - salary;
-        const future = (cash + need*avgUnit) * getRateByContracts(next) * usdToEGP;
-        nextMsg = `<p class="result">If get ${need} more contracts, commission comes to <span class="highlight">${future.toFixed(2)} EGP</span>, JIAYOU EGEA!</p>`;
-      }
+  // 输出（格式要求：文字绿粗，数值红粗，行间距2倍）
+  const out = `
+    <div class="resultBlock">
+      <p>current commission rate： <span class="num">${(rate*100).toFixed(2)}%</span></p>
+      <p>estimated commission： 
+        <span class="num">${formatMoneyEGP(commissionEGP_co_1)}</span> EGP when upgrade coefficient = <span class="num">1</span><br>
+        <span class="num">${formatMoneyEGP(commissionEGP_co_08)}</span> EGP when upgrade coefficient = <span class="num">0.8</span><br>
+        <span class="num">${formatMoneyEGP(commissionEGP_co_12)}</span> EGP when upgrade coefficient = <span class="num">1.2</span>
+      </p>
+      <p>Average unit price (derived): <strong>${avgUnit.toFixed(2)} USD</strong></p>
+      ${nextMsgHTML}
+    </div>
+  `;
 
-      document.getElementById("currentResult").innerHTML = `
-        <p class="result">Current commission rate: <span class="highlight">${(rate*100).toFixed(2)}%</span></p>
-        <p class="result">Estimated commission = 
-          <span class="highlight">${com1.toFixed(2)} EGP</span> when coefficient=1<br>
-          <span class="highlight">${com08.toFixed(2)} EGP</span> when coefficient=0.8<br>
-          <span class="highlight">${com12.toFixed(2)} EGP</span> when coefficient=1.2
-        </p>
-        ${nextMsg}
-      `;
-    }
+  document.getElementById('currentResult').innerHTML = out;
+}
 
-    // Target Commission
-    function calculateTarget() {
-      const above225 = parseInt(document.getElementById("above225").value) || 0;
-      const under150 = parseInt(document.getElementById("under150").value) || 0;
+/* ---------- Target Commission 计算（两个输入，单价分别 1300 / 700 USD） ---------- */
+function calculateTarget(){
+  const above225 = parseInt(document.getElementById('above225').value) || 0;
+  const under150 = parseInt(document.getElementById('under150').value) || 0;
+  const totalContracts = above225 + under150;
+  const revenueUSD = above225 * 1300 + under150 * 700;
+  const rate = getRateByContracts(totalContracts);
+  const commissionEGP = revenueUSD * rate * usdToEGP;
 
-      const contracts = above225 + under150;
-      const revenue = above225*1300 + under150*700;
-      const rate = getRateByContracts(contracts);
-      const commission = revenue * rate * usdToEGP;
+  const out = `
+    <div class="resultBlock">
+      <p>Total contracts: <span class="num">${totalContracts}</span></p>
+      <p>Commission rate: <span class="num">${(rate*100).toFixed(2)}%</span></p>
+      <p>Estimated commission: <span class="num">${formatMoneyEGP(commissionEGP)}</span> EGP</p>
+    </div>
+  `;
+  document.getElementById('targetResult').innerHTML = out;
+}
 
-      document.getElementById("targetResult").innerHTML = `
-        <p class="result">Total contracts: <span class="highlight">${contracts}</span></p>
-        <p class="result">Commission rate: <span class="highlight">${(rate*100).toFixed(2)}%</span></p>
-        <p class="result">Estimated commission: <span class="highlight">${commission.toFixed(2)} EGP</span></p>
-      `;
-    }
-  </script>
+</script>
 </body>
 </html>
